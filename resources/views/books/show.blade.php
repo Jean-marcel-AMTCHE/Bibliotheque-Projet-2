@@ -1,45 +1,61 @@
 @extends('layouts.app')
 
-@section('title', $book['title'])
-
 @section('content')
-<div class="container">
-    <div class="book-details">
-        <div class="book-header">
-            <h1>{{ $book['title'] }}</h1>
-            <div class="book-actions">
-                <form action="{{ route('books.destroy', $book['id']) }}" method="POST" class="inline-form">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn delete" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce livre ?')">
-                        Supprimer
-                    </button>
-                </form>
-                <a href="{{ route('home') }}" class="btn">Retour</a>
-            </div>
-        </div>
-
-        <div class="book-content">
-            <div class="book-image-container">
-                @if(isset($book['image']) && $book['image'])
-                    <img src="{{ asset('storage/'.$book['image']) }}" alt="{{ $book['title'] }}" class="book-image">
-                @else
-                    <img src="{{ asset('images/default-book.jpg') }}" alt="Default" class="book-image">
-                @endif
-            </div>
-
-            <div class="book-info">
-                <div class="info-group">
-                    <p><strong>Auteur:</strong> {{ $book['author'] }}</p>
-                    <p><strong>Année de publication:</strong> {{ date('Y', strtotime($book['year'])) }}</p>
-                    <p><strong>Prix:</strong> {{ $book['price'] }}$</p>
-                    <p><strong>Date d'ajout:</strong> {{ $book['created_at'] }}</p>
-                    <p><strong>Dernière modification:</strong> {{ $book['updated_at'] }}</p>
-                </div>
-                
-                <div class="book-summary">
-                    <h2>Résumé</h2>
-                    <p>{{ $book['summary'] }}</p>
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-lg">
+                <div class="row g-0">
+                    <div class="col-md-4">
+                        <img src="{{ asset('storage/'.$book->cover_image) }}" class="img-fluid rounded-start h-100 object-fit-cover" alt="{{ $book->title }}">
+                    </div>
+                    <div class="col-md-8">
+                        <div class="card-body">
+                            <h1 class="card-title mb-3">{{ $book->title }}</h1>
+                            <h5 class="card-subtitle mb-3 text-muted">par {{ $book->author }}</h5>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <p class="card-text"><strong>Année de publication:</strong> {{ $book->year }}</p>
+                                <p class="card-text">
+                                    @if($book->promotion)
+                                        <span class="text-decoration-line-through text-muted me-2">{{ number_format($book->original_price, 2) }} $</span>
+                                        <span class="text-danger h4">{{ number_format($book->price, 2) }} $</span>
+                                        <span class="badge bg-danger ms-2">Promotion</span>
+                                    @else
+                                        <span class="text-primary h4">{{ number_format($book->price, 2) }} $</span>
+                                    @endif
+                                </p>
+                            </div>
+                            <hr>
+                            <h5 class="card-title mt-4 mb-3">Résumé</h5>
+                            <p class="card-text">{{ $book->summary }}</p>
+                            
+                            <div class="mt-4">
+                                @if(Auth::check() && Auth::user()->isAdmin())
+                                    <a href="{{ route('books.edit', $book) }}" class="btn btn-warning me-2 mb-2">
+                                        <i class="fas fa-edit me-1"></i>Modifier
+                                    </a>
+                                    <form action="{{ route('books.destroy', $book) }}" method="POST" class="d-inline">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-danger me-2 mb-2" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce livre ?')">
+                                            <i class="fas fa-trash-alt me-1"></i>Supprimer
+                                        </button>
+                                    </form>
+                                @endif
+                                
+                                <form action="{{ route('cart.add', $book) }}" method="POST" class="d-inline">
+                                    @csrf
+                                    <button type="submit" class="btn btn-success me-2 mb-2">
+                                        <i class="fas fa-cart-plus me-1"></i>Ajouter au panier
+                                    </button>
+                                </form>
+                                
+                                <a href="{{ route('books.index') }}" class="btn btn-secondary mb-2">
+                                    <i class="fas fa-arrow-left me-1"></i>Retour à la liste
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -47,91 +63,24 @@
 </div>
 
 <style>
-.book-details {
-    background: white;
-    border-radius: 10px;
-    padding: 2rem;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    margin-bottom: 2rem;
-}
-
-.book-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    padding-bottom: 1rem;
-    border-bottom: 2px solid #eee;
-}
-
-.book-header h1 {
-    color: #2c3e50;
-    font-size: 2rem;
-    margin: 0;
-}
-
-.book-content {
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 2rem;
-}
-
-.book-image-container {
-    width: 100%;
-}
-
-.book-image {
-    width: 100%;
-    height: auto;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-.book-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-}
-
-.info-group p {
-    margin: 0.5rem 0;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #eee;
-}
-
-.book-summary {
-    padding-top: 1rem;
-}
-
-.book-summary h2 {
-    color: #2c3e50;
-    margin-bottom: 1rem;
-}
-
-.inline-form {
-    display: inline-block;
-}
-
-.book-actions {
-    display: flex;
-    gap: 1rem;
-}
-
-@media (max-width: 768px) {
-    .book-content {
-        grid-template-columns: 1fr;
+    .card {
+        border: none;
+        border-radius: 15px;
+        overflow: hidden;
     }
-    
-    .book-header {
-        flex-direction: column;
-        gap: 1rem;
-        text-align: center;
+    .btn {
+        border-radius: 20px;
+        padding: 8px 20px;
+        transition: all 0.3s ease;
     }
-    
-    .book-actions {
-        justify-content: center;
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
-}
+    .badge {
+        font-size: 0.8em;
+        padding: 0.5em 0.7em;
+    }
 </style>
 @endsection
 

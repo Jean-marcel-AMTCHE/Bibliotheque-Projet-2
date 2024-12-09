@@ -2,31 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Book;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class BookController extends Controller
 {
-    private function getBooks()
-    {
-        if (!Storage::exists('books.json')) {
-            Storage::put('books.json', json_encode(['books' => []]));
-            return [];
-        }
-        
-        $jsonContent = Storage::get('books.json');
-        $data = json_decode($jsonContent, true);
-        return $data['books'] ?? [];
-    }
-
-    private function saveBooks($books)
-    {
-        Storage::put('books.json', json_encode(['books' => $books]));
-    }
-
     public function index()
     {
-        $books = $this->getBooks();
+        $books = Book::paginate(10);
         return view('books.index', compact('books'));
     }
 
@@ -35,108 +19,105 @@ class BookController extends Controller
         return view('books.create');
     }
 
-    public function store(Request $request)
+    public function show(Book $book)
     {
-        $request->validate([
-            'title' => 'required',
-            'author' => 'required',
-            'year' => 'required|date',
-            'summary' => 'required',
-            'price' => 'required|regex:/^\d+(\.\d{2})?$/',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
-        ]);
-
-        $books = $this->getBooks();
-        
-        $imagePath = null;
-        if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('books', 'public');
-        }
-
-        $newBook = [
-            'id' => count($books) + 1,
-            'title' => $request->title,
-            'author' => $request->author,
-            'year' => $request->year,
-            'summary' => $request->summary,
-            'price' => $request->price,
-            'image' => $imagePath,
-            'created_at' => now()->format('Y-m-d'),
-            'updated_at' => now()->format('Y-m-d')
-        ];
-
-        $books[] = $newBook;
-        $this->saveBooks($books);
-
-        return redirect()->route('home')->with('success', 'Livre ajouté avec succès');
-    }
-
-    public function show($id)
-    {
-        $books = $this->getBooks();
-        $book = collect($books)->firstWhere('id', (int)$id);
-        
-        if (!$book) {
-            abort(404);
-        }
-
         return view('books.show', compact('book'));
     }
 
-    public function destroy($id)
+    public function store(Request $request)
     {
-        $books = $this->getBooks();
-        $book = collect($books)->firstWhere('id', (int)$id);
-        
-        if ($book && isset($book['image']) && $book['image']) {
-            Storage::disk('public')->delete($book['image']);
+        $validatedData = $request->validate([
+            'title' => 'required|max:255',
+            'author' => 'required|max:255',
+            'year' => 'required|integer',
+            'summary' => 'required',
+            'price' => 'required|numeric',
+            'cover_image' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
+            'promotion' => 'boolean'
+        ]);
+
+        $book = new Book($validatedData);
+        $book->promotion = $request->has('promotion');
+
+        if ($request->hasFile('cover_image')) {
+            $imagePath = $request->file('cover_image')->store('covers', 'public');
+            $book->cover_image = $imagePath;
         }
-        
-        $books = array_filter($books, function($book) use ($id) {
-            return $book['id'] !== (int)$id;
-        });
-        
-        $this->saveBooks(array_values($books));
-        
-        return redirect()->route('home')->with('success', 'Livre supprimé avec succès');
+ 
+        $book->save();
+ 
+        return redirect()->route('books.index')->with('success', 'Livre ajouté avec succès');
+    }
+
+    public function edit(Book $book)
+    {
+        return view('books.edit', compact('book'));
+    }
+
+    public function update(Request $request, Book $book)
+    {
+        $validated = $request->validate([
+            'title' => 'required|max:255',
+            'author' => 'required|max:255',
+            'year' => 'required|integer|min:1000|max:' . date('Y'),
+            'summary' => 'required',
+            'price' => 'required|numeric|min:0',
+            'cover_image' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
+            'promotion' => 'boolean',
+        ]);
+
+        if ($request->hasFile('cover_image')) {
+            Storage::disk('public')->delete($book->cover_image);
+            $imagePath = $request->file('cover_image')->store('covers', 'public');
+            $validatedData['cover_image'] = $imagePath;
+        }
+
+        $book->update($validated);
+
+        return redirect()->route('books.show', $book)->with('success', 'Livre mis à jour avec succès.');
+    }
+
+    public function destroy(Book $book)
+    {
+
+        Storage::disk('public')->delete($book->cover_image);
+        $book->delete();
+        return redirect()->route('books.index')->with('success', 'Livre supprimé avec succès.');
     }
 
     public function search(Request $request)
     {
-        $books = $this->getBooks();
-        
+        $query = Book::query();
+
         if ($request->filled('title')) {
-            $books = array_filter($books, function($book) use ($request) {
-                return stripos($book['title'], $request->title) !== false;
-            });
+            $query->where('title', 'like', '%' . $request->title . '%');
         }
-
         if ($request->filled('author')) {
-            $books = array_filter($books, function($book) use ($request) {
-                return stripos($book['author'], $request->author) !== false;
-            });
+            $query->where('author', 'like', '%' . $request->author . '%');
         }
-
         if ($request->filled('year')) {
-            $books = array_filter($books, function($book) use ($request) {
-                return date('Y', strtotime($book['year'])) == $request->year;
-            });
+            $query->where('year', $request->year);
+        }
+        if ($request->filled('min_price') && $request->filled('max_price')) {
+            $query->whereBetween('price', [$request->min_price, $request->max_price]);
         }
 
-        return view('books.index', [
-            'books' => array_values($books)
-        ]);
+        $books = $query->paginate(10);
+
+        return view('books.index', compact('books'));
     }
 
-    public function nouveautes()
-    {
-        $books = $this->getBooks();
-        $recentBooks = array_filter($books, function($book) {
-            $created = \Carbon\Carbon::parse($book['created_at']);
-            return $created->diffInDays(now()) <= 10;
-        });
+    public function deleteBook($id)
+   {
+       $book = Book::findOrFail($id);
+       if ($book->cover_image && Storage::disk('public')->exists($book->cover_image)) {
+           Storage::disk('public')->delete($book->cover_image);
+       }
+       $book->delete();
+       return redirect()->route('books.index')->with('success', 'Livre supprimé avec succès');
+   }
 
-        return view('books.nouveautes', ['books' => $recentBooks]);
-    }
 }
+
+
 

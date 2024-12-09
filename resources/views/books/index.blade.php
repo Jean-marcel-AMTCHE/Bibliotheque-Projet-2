@@ -1,161 +1,97 @@
 @extends('layouts.app')
 
-@section('title', 'Accueil')
-
 @section('content')
-<div class="container">
-    <h1>Bibliothèque AJM</h1>
-    
-    <div class="search-section">
-        <form action="{{ route('books.search') }}" method="GET" class="search-form">
-            <div class="search-group">
-                <label for="title">Titre</label>
-                <input type="text" id="title" name="title" 
-                       placeholder="Rechercher par titre..." 
-                       value="{{ request('title') }}">
-            </div>
+<div class="container py-5">
+    <h1 class="text-center mb-5">Liste des Livres</h1>
 
-            <div class="search-group">
-                <label for="author">Auteur</label>
-                <input type="text" id="author" name="author" 
-                       placeholder="Rechercher par auteur..." 
-                       value="{{ request('author') }}">
-            </div>
-
-            <div class="search-group">
-                <label for="year">Année</label>
-                <select id="year" name="year">
-                    <option value="">Toutes les années</option>
-                    @for($i = date('Y'); $i >= 1900; $i--)
-                        <option value="{{ $i }}" {{ request('year') == $i ? 'selected' : '' }}>
-                            {{ $i }}
-                        </option>
-                    @endfor
-                </select>
-            </div>
-
-            <div class="search-buttons">
-                <button type="submit" class="btn">Rechercher</button>
-                <a href="{{ route('home') }}" class="btn btn-reset">Réinitialiser</a>
-            </div>
-        </form>
-    </div>
-
-    <div class="action-buttons">
-        <a href="{{ route('books.create') }}" class="btn">Ajouter un livre</a>
-    </div>
-
-    @if($books && count($books) > 0)
-        <div class="books-grid">
-            @foreach($books as $book)
-            <div class="book-card">
-                @if(isset($book['image']) && $book['image'])
-                    <img src="{{ asset('storage/'.$book['image']) }}" alt="{{ $book['title'] }}" class="book-image">
-                @else
-                    <img src="{{ asset('images/default-book.jpg') }}" alt="Default" class="book-image">
-                @endif
-                <div class="book-content">
-                    <h2>{{ $book['title'] }}</h2>
-                    <div class="book-info">
-                        <p><span>Auteur:</span> <span>{{ $book['author'] }}</span></p>
-                        <p><span>Année:</span> <span>{{ date('Y', strtotime($book['year'])) }}</span></p>
-                        <p><span>Prix:</span> <span>{{ $book['price'] }}$</span></p>
+    <div class="card shadow-sm mb-5">
+        <div class="card-body">
+            <h5 class="card-title mb-4">Recherche avancée</h5>
+            <form action="{{ route('books.search') }}" method="GET">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <input type="text" name="title" class="form-control" placeholder="Titre">
                     </div>
-                    <div class="book-actions">
-                        <a href="{{ route('books.show', $book['id']) }}" class="btn">Détails</a>
+                    <div class="col-md-3">
+                        <input type="text" name="author" class="form-control" placeholder="Auteur">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" name="year" class="form-control" placeholder="Année">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" name="min_price" class="form-control" placeholder="Prix min">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" name="max_price" class="form-control" placeholder="Prix max">
+                    </div>
+                </div>
+                <div class="text-center mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-2"></i>Rechercher
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if(Auth::check() && Auth::user()->isAdmin())
+        <div class="text-end mb-4">
+            <a href="{{ route('books.create') }}" class="btn btn-success">
+                <i class="fas fa-plus-circle me-2"></i>Ajouter un livre
+            </a>
+        </div>
+    @endif
+
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        @foreach($books as $book)
+            <div class="col">
+                <div class="card h-100 shadow-sm hover-card">
+                    @if($book->cover_image)
+                        <img src="{{ asset('storage/'.$book->cover_image) }}" class="card-img-top" alt="Couverture de {{ $book->title }}" style="height: 300px; object-fit: cover;">
+                    @endif
+                    <div class="card-body">
+                        <h5 class="card-title">{{ $book->title }}</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">{{ $book->author }}</h6>
+                        <p class="card-text"><small class="text-muted">Année: {{ $book->year }}</small></p>
+                        <p class="card-text">{{ Str::limit($book->summary, 100) }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="h5 mb-0">{{ number_format($book->price, 2) }} $</span>
+                            @if($book->promotion)
+                                <span class="badge bg-danger">En promotion</span>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent border-top-0">
+                        <a href="{{ route('books.show', $book) }}" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-info-circle me-2"></i>Voir détails
+                        </a>
                     </div>
                 </div>
             </div>
-            @endforeach
-        </div>
-    @else
-        <div class="no-results">
-            <p>Aucun livre ne correspond à votre recherche.</p>
-        </div>
-    @endif
+        @endforeach
+    </div>
+
+    <div class="d-flex justify-content-center mt-4">
+        {{ $books->links() }}
+    </div>
 </div>
 
 <style>
-.search-section {
-    background-color: white;
-    padding: 2rem;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    margin-bottom: 2rem;
-}
-
-.search-form {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-}
-
-.search-group {
-    display: flex;
-    flex-direction: column;
-}
-
-.search-group label {
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: #2c3e50;
-}
-
-.search-group input,
-.search-group select {
-    padding: 0.8rem;
-    border: 2px solid #e1e1e1;
-    border-radius: 6px;
-    font-size: 1rem;
-    transition: border-color 0.3s ease;
-}
-
-.search-group input:focus,
-.search-group select:focus {
-    border-color: #3498db;
-    outline: none;
-}
-
-.search-buttons {
-    display: flex;
-    gap: 1rem;
-    align-items: flex-end;
-}
-
-.btn-reset {
-    background-color: #95a5a6;
-}
-
-.btn-reset:hover {
-    background-color: #7f8c8d;
-}
-
-.no-results {
-    text-align: center;
-    padding: 3rem;
-    background: white;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    margin-top: 2rem;
-}
-
-.action-buttons {
-    margin: 2rem 0;
-}
-
-@media (max-width: 768px) {
-    .search-form {
-        grid-template-columns: 1fr;
+    .card {
+        border: none;
+        border-radius: 15px;
+        transition: transform 0.3s ease-in-out;
     }
-    
-    .search-buttons {
-        flex-direction: column;
+    .hover-card:hover {
+        transform: translateY(-5px);
     }
-    
-    .search-buttons .btn {
-        width: 100%;
+    .btn {
+        border-radius: 25px;
     }
-}
+    .badge {
+        font-size: 0.8em;
+        padding: 0.5em 0.7em;
+    }
 </style>
 @endsection
 
